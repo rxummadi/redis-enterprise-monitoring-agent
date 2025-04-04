@@ -1,0 +1,300 @@
+# Package Structure for Redis Enterprise Agent
+
+Here's the complete package structure for the Redis Enterprise AI Monitoring and Failover Agent:
+
+```
+redis-agent/
+│
+├── redis_agent/
+│   ├── __init__.py             # Package initialization
+│   ├── main.py                 # Main entry point
+│   ├── core.py                 # Core agent framework
+│   ├── monitoring.py           # Redis monitoring module
+│   ├── anomaly.py              # Anomaly detection module
+│   ├── failover.py             # Failover management module
+│   ├── alerting.py             # Alert management module
+│   ├── api/                    # API server module
+│   │   ├── __init__.py
+│   │   ├── server.py           # API server implementation
+│   │   └── routes.py           # API route definitions
+│   │
+│   └── utils/                  # Utility functions
+│       ├── __init__.py
+│       ├── metrics.py          # Metrics processing
+│       └── config.py           # Configuration handling
+│
+├── tests/                      # Unit and integration tests
+│   ├── __init__.py
+│   ├── test_core.py
+│   ├── test_monitoring.py
+│   ├── test_anomaly.py
+│   ├── test_failover.py
+│   └── test_alerting.py
+│
+├── examples/                   # Example configurations
+│   ├── config_basic.json       # Basic configuration
+│   ├── config_multi_dc.json    # Multi-datacenter configuration
+│   └── config_full.json        # Complete configuration with all options
+│
+├── setup.py                    # Package setup script
+├── requirements.txt            # Package dependencies
+├── README.md                   # Project documentation
+└── LICENSE                     # License information
+```
+
+## Module Implementations
+
+Here's what each of the core modules does:
+
+### `main.py`
+The main entry point for the agent. It parses command-line arguments, initializes all components, and starts the agent.
+
+### `core.py`
+The core agent framework that orchestrates all components. It manages the health status of Redis instances and provides the central coordination point.
+
+### `monitoring.py`
+Handles monitoring Redis Enterprise instances. It collects metrics, checks connectivity, and updates health status.
+
+### `anomaly.py`
+Implements anomaly detection using machine learning to identify unusual patterns in Redis metrics that might indicate issues.
+
+### `failover.py`
+Manages failover decisions and execution, including DNS updates for redirecting traffic from one datacenter to another.
+
+### `alerting.py`
+Handles alert generation and delivery through various channels (Slack, email, PagerDuty).
+
+### `api/server.py`
+Implements an HTTP API server for status monitoring and control.
+
+### `api/routes.py`
+Defines the API routes for the API server.
+
+### `utils/metrics.py`
+Provides utility functions for processing and transforming metrics data.
+
+### `utils/config.py`
+Handles configuration loading and validation.
+
+## Package Setup
+
+The `setup.py` file should look like this:
+
+```python
+from setuptools import setup, find_packages
+
+setup(
+    name="redis-enterprise-agent",
+    version="1.0.0",
+    packages=find_packages(),
+    install_requires=[
+        "redis",
+        "requests",
+        "boto3",
+        "numpy",
+        "scikit-learn",
+        "pandas",
+        "python-dateutil",
+        "fastapi",
+        "uvicorn"
+    ],
+    entry_points={
+        "console_scripts": [
+            "redis-agent=redis_agent.main:main",
+        ],
+    },
+    author="Your Name",
+    author_email="your.email@example.com",
+    description="AI-powered monitoring and failover agent for Redis Enterprise",
+    keywords="redis, monitoring, failover, ai",
+    url="https://github.com/yourusername/redis-enterprise-agent",
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: System Administrators",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+    ],
+    python_requires=">=3.7",
+)
+```
+
+## The API Module
+
+Here's the implementation of the API module for accessing monitoring data and controlling the agent:
+
+```python
+# redis_agent/api/server.py
+import logging
+import json
+from typing import Dict, Any, List, Optional
+from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+logger = logging.getLogger("redis-agent.api")
+
+class FailoverRequest(BaseModel):
+    target_dc: str
+
+class ApiServer:
+    """API server for Redis Enterprise agent."""
+    
+    def __init__(self, core_agent, api_key: str, host: str = "0.0.0.0", port: int = 8080):
+        """Initialize the API server.
+        
+        Args:
+            core_agent: Reference to the core agent
+            api_key: API key for authentication
+            host: Host to bind to
+            port: Port to listen on
+        """
+        self.core = core_agent
+        self.api_key = api_key
+        self.host = host
+        self.port = port
+        self.app = FastAPI(title="Redis Enterprise Agent API")
+        
+        # Add CORS middleware
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        
+        # Add routes
+        self._setup_routes()
+    
+    def _setup_routes(self):
+        """Setup API routes."""
+        
+        @self.app.get("/api/status")
+        async def get_status(api_key: str = Header(...)):
+            """Get health status of all instances."""
+            if api_key != self.api_key:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+            
+            return self.core.get_health_status()
+        
+        @self.app.get("/api/status/{instance_id}")
+        async def get_instance_status(instance_id: str, api_key: str = Header(...)):
+            """Get detailed status of a specific instance."""
+            if api_key != self.api_key:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+            
+            status = self.core.get_instance_health(instance_id)
+            if not status:
+                raise HTTPException(status_code=404, detail="Instance not found")
+            
+            return status
+        
+        @self.app.get("/api/alerts")
+        async def get_alerts(
+            limit: int = 100, 
+            severity: Optional[str] = None, 
+            alert_type: Optional[str] = None,
+            api_key: str = Header(...)
+        ):
+            """Get alerts history."""
+            if api_key != self.api_key:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+            
+            if not hasattr(self.core, "alerting"):
+                raise HTTPException(status_code=501, detail="Alerting module not available")
+            
+            return self.core.alerting.get_alert_history(limit, severity, alert_type)
+        
+        @self.app.post("/api/failover/{instance_id}")
+        async def trigger_failover(instance_id: str, request: FailoverRequest, api_key: str = Header(...)):
+            """Trigger manual failover for an instance."""
+            if api_key != self.api_key:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+            
+            if not hasattr(self.core, "failover"):
+                raise HTTPException(status_code=501, detail="Failover module not available")
+            
+            # Check if instance exists
+            if not self.core.get_instance_health(instance_id):
+                raise HTTPException(status_code=404, detail="Instance not found")
+            
+            # Trigger failover
+            result = self.core.failover.perform_manual_failover(instance_id, request.target_dc)
+            
+            if result:
+                return {"status": "success", "message": f"Failover initiated to {request.target_dc}"}
+            else:
+                raise HTTPException(status_code=500, detail="Failover failed")
+        
+        @self.app.get("/api/metrics/{instance_id}")
+        async def get_metrics(
+            instance_id: str, 
+            hours: int = 1,
+            api_key: str = Header(...)
+        ):
+            """Get metrics history for an instance."""
+            if api_key != self.api_key:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+            
+            if not hasattr(self.core, "monitoring"):
+                raise HTTPException(status_code=501, detail="Monitoring module not available")
+            
+            # Get metrics
+            metrics = self.core.monitoring.get_metrics_history(instance_id, minutes=hours*60)
+            
+            if not metrics:
+                raise HTTPException(status_code=404, detail="No metrics found for instance")
+            
+            return metrics
+    
+    def start(self):
+        """Start the API server."""
+        import uvicorn
+        
+        # Run in a separate thread
+        import threading
+        threading.Thread(
+            target=uvicorn.run,
+            args=(self.app,),
+            kwargs={"host": self.host, "port": self.port},
+            daemon=True
+        ).start()
+        
+        logger.info(f"API server started on {self.host}:{self.port}")
+```
+
+## Incorporating the API Server
+
+To incorporate this API server into the main agent, you need to add the following to `main.py`:
+
+```python
+# In the initialize method of RedisAgentCore
+def initialize(self):
+    # ... existing code ...
+    
+    # Initialize API server if configured
+    if hasattr(self.config, "api") and self.config.api.get("enabled", False):
+        from redis_agent.api.server import ApiServer
+        api_key = self.config.api.get("api_key", "default-key")
+        api_host = self.config.api.get("host", "0.0.0.0")
+        api_port = self.config.api.get("port", 8080)
+        
+        self.api_server = ApiServer(self, api_key, api_host, api_port)
+        self.api_server.start()
+```
+
+And add API configuration to the JSON config:
+
+```json
+"api": {
+  "enabled": true,
+  "api_key": "YOUR_SECURE_API_KEY",
+  "host": "0.0.0.0",
+  "port": 8080
+}
+```
+
+This completes the full implementation of the Redis Enterprise AI Monitoring and Failover Agent.

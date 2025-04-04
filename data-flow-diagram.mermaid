@@ -1,0 +1,78 @@
+flowchart LR
+    subgraph "Data Sources"
+        Redis1["Redis Primary\n(Health Metrics)"]
+        Redis2["Redis Secondary\n(Health Metrics)"]
+        RE_API["Redis Enterprise API\n(Advanced Metrics)"]
+    end
+    
+    subgraph "Data Processing"
+        MetricsCol["Metrics Collection"]
+        MetricsNorm["Metrics Normalization"]
+        FeatureExt["Feature Extraction"]
+        AnomalyModel["ML Model\n(Isolation Forest)"]
+        AnomalyDetect["Anomaly Detection"]
+    end
+    
+    subgraph "Decision Making"
+        HealthStatus["Health Status Tracker"]
+        FailoverEval["Failover Evaluation"]
+        ConfidenceCalc["Confidence Calculation"]
+        DecisionEngine["Decision Engine"]
+    end
+    
+    subgraph "Actions"
+        DNSUpdate["DNS Updates"]
+        AlertGen["Alert Generation"]
+        MetricsStore["Metrics Storage"]
+    end
+    
+    subgraph "Outputs"
+        DNS["Route53/CloudDNS"]
+        Slack["Slack Notifications"]
+        Email["Email Alerts"]
+        PagerDuty["PagerDuty Incidents"]
+        API["REST API"]
+    end
+    
+    %% Data flow connections
+    Redis1 --> MetricsCol
+    Redis2 --> MetricsCol
+    RE_API --> MetricsCol
+    
+    MetricsCol --> MetricsNorm
+    MetricsNorm --> FeatureExt
+    MetricsNorm --> HealthStatus
+    MetricsNorm --> MetricsStore
+    
+    FeatureExt --> AnomalyModel
+    AnomalyModel --> AnomalyDetect
+    
+    AnomalyDetect --> HealthStatus
+    HealthStatus --> FailoverEval
+    AnomalyDetect --> AlertGen
+    
+    FailoverEval --> ConfidenceCalc
+    ConfidenceCalc --> DecisionEngine
+    
+    DecisionEngine -- "Confidence > Threshold" --> DNSUpdate
+    DecisionEngine -- "Any Decision" --> AlertGen
+    
+    DNSUpdate --> DNS
+    AlertGen --> Slack
+    AlertGen --> Email
+    AlertGen --> PagerDuty
+    
+    MetricsStore --> API
+    HealthStatus --> API
+    
+    classDef source fill:#f9f,stroke:#333,stroke-width:1px
+    classDef processing fill:#bbf,stroke:#333,stroke-width:1px
+    classDef decision fill:#bfb,stroke:#333,stroke-width:1px
+    classDef action fill:#fbb,stroke:#333,stroke-width:1px
+    classDef output fill:#ddd,stroke:#333,stroke-width:1px
+    
+    class Redis1,Redis2,RE_API source
+    class MetricsCol,MetricsNorm,FeatureExt,AnomalyModel,AnomalyDetect processing
+    class HealthStatus,FailoverEval,ConfidenceCalc,DecisionEngine decision
+    class DNSUpdate,AlertGen,MetricsStore action
+    class DNS,Slack,Email,PagerDuty,API output

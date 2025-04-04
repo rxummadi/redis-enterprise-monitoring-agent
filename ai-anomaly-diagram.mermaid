@@ -1,0 +1,67 @@
+flowchart TD
+    subgraph "Metrics Collection Phase"
+        Redis["Redis Enterprise Instances"]
+        Metrics["Raw Redis Metrics"]
+        NormMetrics["Normalized Metrics"]
+        Features["Feature Vectors"]
+    end
+    
+    subgraph "Training Phase"
+        Train["Model Training"]
+        DataPrep["Data Preparation"]
+        ModelTrain["Isolation Forest Training"]
+        ModelSave["Model Saving"]
+    end
+    
+    subgraph "Inference Phase"
+        NewMetrics["New Metrics"]
+        FeatureExtract["Feature Extraction"]
+        ModelInfer["Model Inference"]
+        AnomalyScore["Anomaly Score Calculation"]
+        AnomalyDetect["Anomaly Detection"]
+    end
+    
+    subgraph "Decision Phase"
+        Thresholds["Threshold Evaluation"]
+        HealthUpdate["Health Status Update"]
+        AlertDecision["Alert Decision"]
+        FailoverDecision["Failover Decision"]
+    end
+    
+    %% Collection Flow
+    Redis --> Metrics
+    Metrics --> NormMetrics
+    NormMetrics --> Features
+    
+    %% Training Flow
+    Features --> DataPrep
+    DataPrep --> ModelTrain
+    ModelTrain --> ModelSave
+    
+    %% Inference Flow
+    Redis --> NewMetrics
+    NewMetrics --> NormMetrics
+    NormMetrics --> FeatureExtract
+    FeatureExtract --> ModelInfer
+    ModelInfer --> AnomalyScore
+    AnomalyScore --> AnomalyDetect
+    
+    %% Decision Flow
+    AnomalyDetect --> Thresholds
+    Thresholds --> HealthUpdate
+    Thresholds --> AlertDecision
+    AnomalyScore -- "Score > Critical Threshold" --> FailoverDecision
+    
+    %% Connect Phases
+    Train -- "Scheduled\nRetraining" --> ModelInfer
+    ModelSave -- "Load\nModel" --> ModelInfer
+    
+    classDef collection fill:#f9f,stroke:#333,stroke-width:1px
+    classDef training fill:#bbf,stroke:#333,stroke-width:1px
+    classDef inference fill:#bfb,stroke:#333,stroke-width:1px
+    classDef decision fill:#fbb,stroke:#333,stroke-width:1px
+    
+    class Redis,Metrics,NormMetrics,Features collection
+    class Train,DataPrep,ModelTrain,ModelSave training
+    class NewMetrics,FeatureExtract,ModelInfer,AnomalyScore,AnomalyDetect inference
+    class Thresholds,HealthUpdate,AlertDecision,FailoverDecision decision

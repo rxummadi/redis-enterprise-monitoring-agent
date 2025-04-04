@@ -1,0 +1,376 @@
+# Redis Enterprise AI Monitoring and Failover Agent
+
+## Setup and Installation Guide
+
+This guide walks you through installing and configuring the Redis Enterprise AI Monitoring and Failover Agent.
+
+## Prerequisites
+
+- Python 3.7 or higher
+- Access to Redis Enterprise clusters
+- Route53 or other DNS service for failover (if using DNS-based failover)
+- SMTP server for email alerts (optional)
+- Slack webhook for Slack alerts (optional)
+- PagerDuty service key for PagerDuty alerts (optional)
+
+## Installation
+
+### Step 1: Clone the repository
+
+```bash
+git clone https://github.com/yourusername/redis-enterprise-agent.git
+cd redis-enterprise-agent
+```
+
+### Step 2: Create a virtual environment
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### Step 3: Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+The `requirements.txt` file should contain:
+
+```
+redis
+requests
+boto3
+numpy
+scikit-learn
+pandas
+python-dateutil
+```
+
+### Step 4: Create configuration file
+
+Create a JSON configuration file (e.g., `config.json`) based on the provided sample. Update it with your specific Redis Enterprise clusters, DNS settings, and alert endpoints.
+
+### Step 5: Test the configuration
+
+```bash
+python -m redis_agent.main --config config.json --verbose
+```
+
+### Step 6: Setup as a service
+
+#### On Linux (systemd)
+
+Create a systemd service file at `/etc/systemd/system/redis-agent.service`:
+
+```ini
+[Unit]
+Description=Redis Enterprise AI Monitoring and Failover Agent
+After=network.target
+
+[Service]
+Type=simple
+User=redis-agent
+WorkingDirectory=/opt/redis-agent
+ExecStart=/opt/redis-agent/venv/bin/python -m redis_agent.main --config /etc/redis-agent/config.json
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+
+```bash
+sudo systemctl enable redis-agent
+sudo systemctl start redis-agent
+```
+
+Check the service status:
+
+```bash
+sudo systemctl status redis-agent
+```
+
+#### On Docker
+
+You can also run the agent in a Docker container. Create a `Dockerfile`:
+
+```Dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "-m", "redis_agent.main", "--config", "/config/config.json"]
+```
+
+Build and run the Docker image:
+
+```bash
+docker build -t redis-enterprise-agent .
+docker run -v $(pwd)/config.json:/config/config.json redis-enterprise-agent
+```
+
+## Configuration Reference
+
+The configuration file is in JSON format with the following structure:
+
+### Redis Instances
+
+Define all Redis instances to monitor:
+
+```json
+"instances": [
+  {
+    "name": "cache-service",
+    "uid": "redis-cache-01",
+    "endpoints": {
+      "primary": {
+        "host": "redis-cache.primary.example.com",
+        "port": 16379
+      },
+      "secondary": {
+        "host": "redis-cache.secondary.example.com",
+        "port": 16379
+      }
+    },
+    "active_dc": "primary",
+    "password": "YOUR_REDIS_PASSWORD"
+  }
+]
+```
+
+### Datacenters
+
+Define the datacenters where Redis Enterprise clusters are hosted:
+
+```json
+"datacenters": {
+  "primary": {
+    "name": "US-EAST",
+    "api_url": "https://cluster1.redis-enterprise.example.com:9443",
+    "api_user": "admin@example.com",
+    "api_password": "YOUR_API_PASSWORD"
+  },
+  "secondary": {
+    "name": "US-WEST",
+    "api_url": "https://cluster2.redis-enterprise.example.com:9443",
+    "api_user": "admin@example.com",
+    "api_password": "YOUR_API_PASSWORD"
+  }
+}
+```
+
+### Monitoring Settings
+
+```json
+"monitoring_interval": 30,  // Seconds between health checks
+"decision_interval": 60,    // Seconds between failover decisions
+```
+
+### Anomaly Detection
+
+```json
+"model_path": "/opt/redis-agent/models",  // Path to store ML models
+"anomaly_threshold": 0.8,  // Threshold for anomaly detection (0.0-1.0)
+```
+
+### Failover Settings
+
+```json
+"auto_failover": true,  // Set to false for manual failover only
+"failover_provider": "dns",  // Currently only 'dns' is supported
+"failover_confidence_threshold": 0.95,  // Confidence required for automatic failover
+"failover_consecutive_threshold": 3  // Consecutive failures before failover
+```
+
+### DNS Configuration (for failover)
+
+```json
+"dns_provider": "route53",  // Currently 'route53' or 'clouddns'
+"dns_config": {
+  "zone_id": "Z1ABCDEFGHIJKL",  // Route53 hosted zone ID
+  "aws_region": "us-east-1",
+  "aws_access_key": "YOUR_AWS_ACCESS_KEY",
+  "aws_secret_key": "YOUR_AWS_SECRET_KEY",
+  "records": [
+    {
+      "instance_name": "cache-service",  // Must match the instance name above
+      "name": "redis-cache.example.com",  // DNS record to update
+      "type": "CNAME",
+      "ttl": 60
+    }
+  ]
+}
+```
+
+### Alert Endpoints
+
+```json
+"alert_endpoints": {
+  "slack": {
+    "webhook_url": "https://hooks.slack.com/services/TXXXXXX/BXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXX"
+  },
+  "email": {
+    "smtp_server": "smtp.example.com",
+    "port": 587,
+    "use_tls": true,
+    "username": "alerts@example.com",
+    "password": "YOUR_SMTP_PASSWORD",
+    "from_address": "redis-monitor@example.com",
+    "to_addresses": ["ops-team@example.com", "oncall@example.com"]
+  },
+  "pagerduty": {
+    "service_key": "YOUR_PAGERDUTY_SERVICE_KEY",
+    "client_url": "https://redis-monitor.example.com"
+  }
+}
+```
+
+## Commands and Operations
+
+### Starting the Agent
+
+Basic command:
+
+```bash
+python -m redis_agent.main --config config.json
+```
+
+With verbose logging:
+
+```bash
+python -m redis_agent.main --config config.json --verbose
+```
+
+Disable automatic failover:
+
+```bash
+python -m redis_agent.main --config config.json --no-failover
+```
+
+### Manual Failover
+
+You can trigger a manual failover using the API:
+
+```bash
+curl -X POST http://localhost:8080/api/failover/redis-cache-01 \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"target_dc": "secondary"}'
+```
+
+### Checking Status
+
+Get health status of all instances:
+
+```bash
+curl -X GET http://localhost:8080/api/status \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+Get alerts history:
+
+```bash
+curl -X GET http://localhost:8080/api/alerts \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Monitoring and Alerting
+
+The agent monitors the following key metrics:
+
+1. **Basic Redis metrics**
+   - Response time
+   - Memory usage
+   - Hit rate
+   - Connected clients
+   - Operation throughput
+   - Rejected connections
+   - Evicted keys
+
+2. **Redis Enterprise specific metrics**
+   - Shard metrics
+   - Cluster metrics
+   - Cross-datacenter replication status
+
+Alerts are generated for:
+
+1. **Anomaly detection**
+   - Unusual patterns in Redis metrics
+   - Latency spikes
+   - Memory usage anomalies
+   - Operation pattern changes
+
+2. **Threshold-based alerts**
+   - High memory usage (>90%)
+   - High latency (>100ms)
+   - Low hit rate (<50%)
+   - Connection saturation
+
+3. **Availability issues**
+   - Connection failures
+   - Authentication failures
+   - Replication failures
+
+4. **Failover events**
+   - Automatic failover executed
+   - Manual failover required
+   - Failover success/failure
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Connection failures**
+   
+   Check Redis connectivity:
+   
+   ```bash
+   redis-cli -h redis-host -p port -a password ping
+   ```
+
+2. **Authentication failures**
+   
+   Verify credentials in configuration file.
+
+3. **DNS update failures**
+   
+   Verify AWS credentials and permissions:
+   
+   ```bash
+   aws route53 list-hosted-zones --profile your-profile
+   ```
+
+4. **Agent not detecting issues**
+   
+   Check monitoring interval and thresholds in configuration.
+
+### Logs
+
+The agent logs to both the console and a log file. Check the logs at:
+
+- `/var/log/redis-agent.log` (when running as a service)
+- Console output (when running directly)
+
+Increase verbosity with the `--verbose` flag for more detailed logs.
+
+## API Reference
+
+The agent provides a REST API for status and control:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | Get health status of all instances |
+| `/api/status/:instance_id` | GET | Get detailed status of a specific instance |
+| `/api/alerts` | GET | Get alerts history |
+| `/api/failover/:instance_id` | POST | Trigger manual failover |
+| `/api/metrics/:instance_id` | GET | Get metrics history |
+
+All API requests must include the `X-API-Key` header with your configured API key.

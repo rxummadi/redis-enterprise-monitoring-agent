@@ -1,0 +1,103 @@
+{
+  "instances": [
+    {
+      "name": "cache-service",
+      "uid": "redis-cache-01",
+      "endpoints": {
+        "primary": {
+          "host": "redis-cache.primary.example.com",
+          "port": 16379
+        },
+        "secondary": {
+          "host": "redis-cache.secondary.example.com",
+          "port": 16379
+        }
+      },
+      "active_dc": "primary",
+      "password": "YOUR_REDIS_PASSWORD"
+    },
+    {
+      "name": "session-store",
+      "uid": "redis-session-01",
+      "endpoints": {
+        "primary": {
+          "host": "redis-session.primary.example.com",
+          "port": 16380
+        },
+        "secondary": {
+          "host": "redis-session.secondary.example.com",
+          "port": 16380
+        }
+      },
+      "active_dc": "primary",
+      "password": "YOUR_REDIS_PASSWORD"
+    }
+  ],
+  
+  "datacenters": {
+    "primary": {
+      "name": "US-EAST",
+      "api_url": "https://cluster1.redis-enterprise.example.com:9443",
+      "api_user": "admin@example.com",
+      "api_password": "YOUR_API_PASSWORD"
+    },
+    "secondary": {
+      "name": "US-WEST",
+      "api_url": "https://cluster2.redis-enterprise.example.com:9443",
+      "api_user": "admin@example.com",
+      "api_password": "YOUR_API_PASSWORD"
+    }
+  },
+  
+  "monitoring_interval": 30,
+  "decision_interval": 60,
+  
+  "model_path": "/opt/redis-agent/models",
+  "anomaly_threshold": 0.8,
+  
+  "auto_failover": true,
+  "failover_provider": "dns",
+  "failover_confidence_threshold": 0.95,
+  "failover_consecutive_threshold": 3,
+  
+  "dns_provider": "route53",
+  "dns_config": {
+    "zone_id": "Z1ABCDEFGHIJKL",
+    "aws_region": "us-east-1",
+    "aws_access_key": "YOUR_AWS_ACCESS_KEY",
+    "aws_secret_key": "YOUR_AWS_SECRET_KEY",
+    "records": [
+      {
+        "instance_name": "cache-service",
+        "name": "redis-cache.example.com",
+        "type": "CNAME",
+        "ttl": 60
+      },
+      {
+        "instance_name": "session-store",
+        "name": "redis-session.example.com",
+        "type": "CNAME",
+        "ttl": 60
+      }
+    ]
+  },
+  
+  "alert_endpoints": {
+    "slack": {
+      "webhook_url": "https://hooks.slack.com/services/TXXXXXX/BXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXX"
+    },
+    "email": {
+      "smtp_server": "smtp.example.com",
+      "port": 587,
+      "use_tls": true,
+      "username": "alerts@example.com",
+      "password": "YOUR_SMTP_PASSWORD",
+      "from_address": "redis-monitor@example.com",
+      "to_addresses": ["ops-team@example.com", "oncall@example.com"]
+    },
+    "pagerduty": {
+      "service_key": "YOUR_PAGERDUTY_SERVICE_KEY",
+      "client_url": "https://redis-monitor.example.com"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+sequenceDiagram
+    participant CM as Monitoring Thread
+    participant CR as Redis Instances
+    participant CA as Anomaly Detector
+    participant CF as Failover Manager
+    participant CD as DNS Provider
+    participant CSL as Slack/Email
+    
+    Note over CM,CSL: Normal Monitoring Flow
+    
+    loop Every monitoring_interval
+        CM->>CR: Check health (PING)
+        CR-->>CM: Response (latency)
+        CM->>CR: Get metrics (INFO)
+        CR-->>CM: Return metrics
+        CM->>CA: Process metrics
+        CA->>CA: Detect anomalies
+        alt No anomalies
+            CA-->>CM: Status: healthy
+        else Anomaly detected (low confidence)
+            CA-->>CM: Status: degraded
+            CA->>CSL: Send warning alert
+        else Anomaly detected (high confidence)
+            CA-->>CM: Status: failing
+            CA->>CSL: Send critical alert
+            CA->>CF: Evaluate for failover
+        end
+    end
+    
+    Note over CM,CSL: Failover Decision Flow
+
+    CF->>CF: Calculate failover confidence
+    alt Confidence > threshold
+        CF->>CSL: Send failover alert
+        CF->>CD: Update DNS records
+        CD->>CD: Modify DNS entries
+        CD-->>CF: DNS update successful
+        CF->>CSL: Send failover complete alert
+    else Confidence <= threshold
+        CF->>CSL: Send manual intervention alert
+    end
+    
+    Note over CM,CSL: Manual Operations Flow
+    
+    participant OP as Operator
+    participant API as REST API
+    
+    OP->>API: Request manual failover
+    API->>CF: Execute manual failover
+    CF->>CD: Update DNS records
+    CD->>CD: Modify DNS entries
+    CD-->>CF: DNS update successful
+    CF->>CSL: Send failover complete alert
+    API-->>OP: Failover complete response

@@ -1,0 +1,177 @@
+# Redis Enterprise AI Monitoring and Failover Agent Architecture
+
+## System Architecture Overview
+
+The Redis Enterprise AI Monitoring and Failover Agent is designed with a modular architecture that separates concerns while maintaining efficient data flow. The system is comprised of several key components that work together to monitor Redis instances, detect anomalies, make failover decisions, and execute actions.
+
+### Core Components
+
+1. **Core Framework**
+   - Acts as the central orchestration layer
+   - Manages configuration and component lifecycle
+   - Coordinates communication between modules
+   - Tracks health status of Redis instances
+
+2. **Monitoring Layer**
+   - Collects metrics from Redis Enterprise instances via Redis commands (INFO, PING)
+   - Collects advanced metrics from Redis Enterprise API
+   - Normalizes and processes raw metrics
+   - Updates health status in real-time
+
+3. **Analysis Layer**
+   - Processes metrics and extracts features for ML
+   - Trains anomaly detection models using Isolation Forest algorithm
+   - Detects anomalies in real-time metrics
+   - Calculates anomaly scores and identifies contributing factors
+
+4. **Decision Layer**
+   - Evaluates health status across datacenters
+   - Calculates confidence scores for potential failover actions
+   - Applies decision policies based on configuration
+   - Initiates or recommends failover actions
+
+5. **Action Layer**
+   - Executes DNS updates for traffic redirection
+   - Generates and delivers alerts through multiple channels
+   - Stores metrics and events for historical analysis
+   - Provides API for external systems integration
+
+## Data Flow
+
+The data flows through the system in a logical progression:
+
+1. **Metrics Collection**
+   - Raw metrics are collected from Redis instances via Redis commands
+   - Advanced metrics are collected from Redis Enterprise API
+   - Metrics are normalized and processed for analysis
+
+2. **Anomaly Detection**
+   - Features are extracted from normalized metrics
+   - Features are fed into the Isolation Forest model
+   - Anomaly scores are calculated and evaluated against thresholds
+   - Anomalous metrics are identified and analyzed for contributing factors
+
+3. **Decision Making**
+   - Health status is updated based on anomaly detection results
+   - Failover decisions are evaluated using a multi-factor approach
+   - Confidence scores are calculated for potential actions
+   - Actions are initiated based on confidence thresholds
+
+4. **Action Execution**
+   - DNS records are updated to redirect traffic (if failover is needed)
+   - Alerts are generated and delivered through configured channels
+   - Metrics and events are stored for historical analysis
+   - API endpoints provide access to current status and historical data
+
+## AI Implementation
+
+The AI implementation centers around anomaly detection using the Isolation Forest algorithm:
+
+1. **Model Training**
+   - Historical metrics are collected and normalized
+   - Features are extracted and prepared for training
+   - Isolation Forest model is trained with configurable contamination factor
+   - Trained model is saved for future inference
+
+2. **Anomaly Detection**
+   - New metrics are processed and transformed into feature vectors
+   - Feature vectors are fed into the trained model
+   - Anomaly scores are calculated (higher score = more anomalous)
+   - Scores are compared against configurable thresholds
+
+3. **Anomaly Analysis**
+   - Contributing factors to anomalies are identified
+   - Z-scores are calculated for individual metrics
+   - Outlier metrics are ranked by contribution to the anomaly
+   - Context is provided for human operators
+
+4. **Continuous Learning**
+   - Models are periodically retrained with new data
+   - System adapts to changing usage patterns over time
+   - Thresholds can be dynamically adjusted based on historical trends
+
+## Failover Process
+
+The failover process involves several critical steps:
+
+1. **Health Evaluation**
+   - Primary datacenter health is continuously monitored
+   - Secondary datacenter health is verified as viable for failover
+   - Multiple metrics and anomaly detection results are considered
+
+2. **Decision Calculation**
+   - Confidence score is calculated based on multiple factors:
+     - Severity of issues in primary datacenter
+     - Stability of secondary datacenter
+     - Historical patterns and reliability
+     - Recent failover history (to prevent flapping)
+
+3. **Failover Execution**
+   - DNS records are updated to point to the secondary datacenter
+   - Alerts are sent to notify operators of the failover
+   - Health status is continually monitored post-failover
+   - Metrics are collected to validate successful failover
+
+4. **Recovery Tracking**
+   - Primary datacenter health is monitored for recovery
+   - Recovery duration and stability are tracked
+   - Failback recommendations are generated when appropriate
+
+## Deployment Architecture
+
+The agent is designed to be deployed in a variety of environments:
+
+1. **Standalone Service**
+   - Runs as a Python service on a dedicated server
+   - Interacts with Redis instances and external services
+
+2. **Containerized Deployment**
+   - Packaged as a Docker container
+   - Easily deployed in Kubernetes or other container environments
+
+3. **High Availability Deployment**
+   - Multiple agent instances can be deployed for redundancy
+   - Leader election ensures single source of truth for decisions
+   - Non-leader instances operate in monitoring-only mode
+
+## Communication Patterns
+
+The system uses several communication patterns:
+
+1. **Synchronous Monitoring**
+   - Direct Redis commands (PING, INFO) for real-time health checks
+   - HTTP calls to Redis Enterprise API for advanced metrics
+
+2. **Asynchronous Processing**
+   - Background threads for non-critical tasks
+   - Periodic model training and evaluation
+
+3. **Event-Based Alerting**
+   - Alerts triggered by threshold violations
+   - Webhooks, email, and API calls for notification delivery
+
+4. **RESTful API**
+   - HTTP API for external system integration
+   - Status queries and manual control operations
+
+## Security Considerations
+
+The agent includes several security features:
+
+1. **Authentication**
+   - API key authentication for REST API
+   - Credential management for Redis and external services
+
+2. **Encryption**
+   - TLS for Redis connections (when configured)
+   - HTTPS for API endpoints
+
+3. **Least Privilege**
+   - Minimal permissions for DNS updates
+   - Read-only Redis commands when possible
+
+4. **Audit Trail**
+   - Logging of all decisions and actions
+   - Alert history for accountability
+
+This architecture provides a robust, scalable, and intelligent solution for monitoring Redis Enterprise instances and managing failover between datacenters.

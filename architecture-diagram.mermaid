@@ -1,0 +1,84 @@
+flowchart TD
+    subgraph "Redis Enterprise Clusters"
+        RD1["Redis Primary DC"]
+        RD2["Redis Secondary DC"]
+    end
+
+    subgraph "Redis Agent Components"
+        Core["Core Framework"]
+        
+        subgraph "Monitoring Layer"
+            Mon["Redis Monitoring"]
+            API_Mon["API Monitoring"]
+        end
+        
+        subgraph "Analysis Layer"
+            Ano["Anomaly Detection"]
+            Met["Metrics Processing"]
+        end
+        
+        subgraph "Decision Layer"
+            FM["Failover Manager"]
+            Dec["Decision Engine"]
+        end
+        
+        subgraph "Action Layer"
+            DNS["DNS Failover Provider"]
+            Alert["Alert Manager"]
+        end
+        
+        subgraph "API Layer"
+            REST["REST API Server"]
+        end
+    end
+    
+    subgraph "External Systems"
+        Route53["AWS Route53"]
+        Slack["Slack"]
+        Email["Email"]
+        PD["PagerDuty"]
+        Clients["Client Applications"]
+    end
+    
+    %% Connections
+    RD1 <--> Mon
+    RD2 <--> Mon
+    RD1 <--> API_Mon
+    RD2 <--> API_Mon
+    
+    Mon --> Core
+    API_Mon --> Core
+    
+    Core --> Ano
+    Core --> Met
+    
+    Met --> Ano
+    Ano --> FM
+    
+    Core --> FM
+    FM --> Dec
+    Dec --> DNS
+    
+    Core --> Alert
+    Ano --> Alert
+    Dec --> Alert
+    
+    Core --> REST
+    
+    DNS --> Route53
+    Alert --> Slack
+    Alert --> Email
+    Alert --> PD
+    
+    REST --> Clients
+    Route53 --> Clients
+    
+    classDef primary fill:#f96,stroke:#333,stroke-width:2px
+    classDef secondary fill:#69f,stroke:#333,stroke-width:2px
+    classDef core fill:#6b6,stroke:#333,stroke-width:2px
+    classDef external fill:#eee,stroke:#333,stroke-width:1px
+    
+    class RD1 primary
+    class RD2 secondary
+    class Core core
+    class Route53,Slack,Email,PD,Clients external
