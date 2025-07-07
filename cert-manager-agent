@@ -1,0 +1,13 @@
+<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+
+// Generate a complete, production-ready Golang agent to manage TLS certificate lifecycle in Kubernetes environments. The agent must:
+// 1. Scan Kubernetes ConfigMaps to identify hostnames of upstream systems and extract the certificates from these upstream systems using a TLS handshake.
+// 2. Scan Kubernetes Secrets to identify certificates (including .jks, .pfx, .crt, .pem, .p12 files) and associated password keys.
+//    - If password is unknown, attempt to locate it in other secrets within the same namespace or default to 'changeit'.
+//    - Since secret keys do not have file extensions, detect certificate content heuristically by analyzing the byte patterns or using PEM/DER signature identification.
+//    - For each client certificate found, determine impacted Deployments/StatefulSets by matching the secret in volume mounts.
+// 3. Scan all Istio Ingress Gateway configurations to identify hostnames, and extract certificates using a TLS handshake.
+// 4. Store detailed certificate metadata (issuer, expiration dates, validity, associated secret keys, impacted workloads) in Redis.
+// 5. Provide intelligent certificate rotation recommendations based on expiration, validity criteria, and usage status, stored in Redis.
+// 6. Integrate seamlessly with OpenAI's GenAI for human-friendly queries and recommendations.
+// Ensure the code is modular, scalable, and includes clear comments and error handling.
